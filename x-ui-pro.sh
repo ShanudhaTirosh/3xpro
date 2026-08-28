@@ -314,10 +314,10 @@ sqlite3 "$XUIDB" << EOF
 		1, 0, 0, 0, 'NovaNetX-VLESS', 1, 1, 0,
 		'never', 1, 0, '', 443,
 		'vless',
-		'{"clients":[{"id":"${NOVA_UUID_ZOOM}","flow":"xtls-rprx-vision","email":"novanetx-vision"}],"decryption":"none","fallbacks":[{"dest":8443}]}',
-		'{"network":"tcp","security":"tls","tlsSettings":{"serverName":"zoom.us","certificates":[{"certificateFile":"/etc/letsencrypt/live/${MainDomain}/fullchain.pem","keyFile":"/etc/letsencrypt/live/${MainDomain}/privkey.pem"}]},"tcpSettings":{"header":{"type":"none"}}}',
-		'inbound-443-vless-vision',
-		'{"enabled":true,"destOverride":["http","tls","quic"]}'
+		'{"clients":[{"id":"${NOVA_UUID_ZOOM}","email":"novanetx-direct"}],"decryption":"none"}',
+		'{"network":"tcp","security":"tls","tlsSettings":{"serverName":"aka.ms","minVersion":"1.2","maxVersion":"1.3","cipherSuites":"","alpn":["h2","http/1.1"],"certificates":[{"certificateFile":"/etc/letsencrypt/live/${MainDomain}/fullchain.pem","keyFile":"/etc/letsencrypt/live/${MainDomain}/privkey.pem"}]},"tcpSettings":{"header":{"type":"none"}}}',
+		'inbound-443-vless-direct',
+		'{"enabled":false}'
 	);
 	INSERT INTO inbounds (
 		user_id, up, down, total, remark, sub_sort_index, enable, expiry_time, 
@@ -325,13 +325,13 @@ sqlite3 "$XUIDB" << EOF
 		protocol, settings, stream_settings, tag, sniffing, share_addr_strategy, share_addr
 	) VALUES (
 		1, 0, 0, 0, 'NovaNetX-VLESS-WS', 1, 1, 0,
-		'never', 1, 0, '127.0.0.1', 2083,
+		'never', 1, 0, '', 8443,
 		'vless',
 		'{"clients":[{"id":"${NOVA_UUID_WS}","email":"novanetx-ws"}],"decryption":"none"}',
-		'{"network":"ws","security":"none","wsSettings":{"path":"/${cdndomain}","headers":{"Host":"${cdndomain}"}}}',
-		'inbound-2083-vless-ws',
-		'{"enabled":true,"destOverride":["http","tls","quic"]}',
-		'custom', '172.66.40.229:443'
+		'{"network":"ws","security":"tls","tlsSettings":{"serverName":"${cdndomain}","minVersion":"1.2","maxVersion":"1.3","alpn":["h2","http/1.1"],"certificates":[{"certificateFile":"/etc/letsencrypt/live/${MainDomain}/fullchain.pem","keyFile":"/etc/letsencrypt/live/${MainDomain}/privkey.pem"}]},"wsSettings":{"path":"/${cdndomain}","headers":{"Host":"${cdndomain}"}}}',
+		'inbound-8443-vless-ws',
+		'{"enabled":false}',
+		'custom', '172.67.143.61:8443'
 	);
 EOF
 fi
@@ -383,7 +383,6 @@ server {
 	server_name $MainDomain *.$MainDomain $domain $cdndomain;
 	listen 80;
 	listen [::]:80;
-	listen 127.0.0.1:8443;
 	${NEW_H2}http2 on; http3 on;
 	index index.html index.htm index.php index.nginx-debian.html;
 	root /var/www/html/;
@@ -589,10 +588,10 @@ if systemctl is-active --quiet x-ui || command -v x-ui &> /dev/null; then
 	NOVA_UUID_WS=$(cat ${HOME}/.cache/nova_uuid_ws.txt 2>/dev/null || echo "3494c157-b4ff-4d72-9879-1480d7665ba9")
 	NOVA_DIR_DOM=$(cat ${HOME}/.cache/nova_domain.txt 2>/dev/null || echo "$domain")
 	NOVA_CDN_DOM=$(cat ${HOME}/.cache/nova_cdndomain.txt 2>/dev/null || echo "$cdndomain")
-	msg_inf "1. NovaNetX-VLESS (Direct TCP + Vision + TLS):"
-	msg "vless://${NOVA_UUID_ZOOM}@${NOVA_DIR_DOM}:443/?encryption=none&flow=xtls-rprx-vision&security=tls&fp=chrome&sni=zoom.us&type=tcp&headerType=none#NovaNetX-VLESS\n"
+	msg_inf "1. NovaNetX-VLESS (Direct TCP + TLS - aka.ms SNI):"
+	msg "vless://${NOVA_UUID_ZOOM}@${NOVA_DIR_DOM}:443/?encryption=none&security=tls&fp=chrome&sni=aka.ms&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none#NovaNetX-VLESS\n"
 	msg_inf "2. NovaNetX-VLESS-WS (WebSocket + TLS + Cloudflare CDN):"
-	msg "vless://${NOVA_UUID_WS}@172.66.40.229:443/?encryption=none&flow=none&security=tls&fp=chrome&sni=${NOVA_CDN_DOM}&type=ws&host=${NOVA_CDN_DOM}&headerType=none&path=%2f${NOVA_CDN_DOM}#NovaNetX-VLESS-WS\n"
+	msg "vless://${NOVA_UUID_WS}@172.67.143.61:8443/?encryption=none&security=tls&fp=chrome&sni=${NOVA_CDN_DOM}&alpn=h2%2Chttp%2F1.1&type=ws&host=${NOVA_CDN_DOM}&headerType=none&path=%2f${NOVA_CDN_DOM}#NovaNetX-VLESS-WS\n"
 	hrline
 	msg_ok "ArgoSBX(SingBox) Configs Subscription URL:\n"
 	msg_inf "https://${domain}/${randname}"
