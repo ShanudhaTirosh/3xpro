@@ -382,7 +382,7 @@ server {
 	server_name $MainDomain *.$MainDomain $domain $cdndomain;
 	listen 80;
 	listen [::]:80;
-	listen 127.0.0.1:8443 ssl${OLD_H2};
+	listen 127.0.0.1:8443;
 	${NEW_H2}http2 on; http3 on;
 	index index.html index.htm index.php index.nginx-debian.html;
 	root /var/www/html/;
