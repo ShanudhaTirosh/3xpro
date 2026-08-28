@@ -180,8 +180,8 @@ sudo bash -c 'type apt&&{ apt update&&apt install -y build-essential; }||type dn
 sudo $Pak -y purge sqlite sqlite3 python3-certbot-nginx 2>/dev/null || true
 [[ $Pak == *apt ]]&&sudo apt update||sudo dnf makecache
 
-for p in epel-release cronie psmisc unzip curl nginx nginx-full python3 certbot python3-certbot-nginx sqlite sqlite3 jq openssl tor tor-geoipdb;do
-  (command -v dpkg&>/dev/null && dpkg -l $p&>/dev/null)||(rpm -q $p&>/dev/null)||sudo $Pak -y install $p
+for p in cronie psmisc unzip curl nginx nginx-full python3 certbot python3-certbot-nginx sqlite3 jq openssl tor tor-geoipdb;do
+  (command -v dpkg&>/dev/null && dpkg -l $p&>/dev/null)||(rpm -q $p&>/dev/null)||sudo $Pak -y install $p >/dev/null 2>&1 || true
 done
 
 service_enable "nginx" "tor" "cron" "crond"
@@ -209,13 +209,19 @@ IP6=$(ip route get 2620:fe::fe 2>&1 | grep -Po -- 'src \K\S*')
 [[ $IP6 =~ $IP6_REGEX ]] || IP6=$(curl -s ipv6.icanhazip.com);
 ################//////////////Install SSL################################################################
 if [[ "$domain" != "$cdndomain" ]]; then
-	certbot certonly --standalone --non-interactive --force-renewal --agree-tos --register-unsafely-without-email --cert-name "$MainDomain" -d "$domain" -d "$cdndomain"
+	certbot certonly --standalone --non-interactive --force-renewal --agree-tos --register-unsafely-without-email --cert-name "$MainDomain" -d "$domain" -d "$cdndomain" 2>/dev/null || \
+	certbot certonly --standalone --non-interactive --force-renewal --agree-tos --register-unsafely-without-email --cert-name "$MainDomain" -d "$domain" 2>/dev/null || true
 else
-	certbot certonly --standalone --non-interactive --force-renewal --agree-tos --register-unsafely-without-email --cert-name "$MainDomain" -d "$domain"
+	certbot certonly --standalone --non-interactive --force-renewal --agree-tos --register-unsafely-without-email --cert-name "$MainDomain" -d "$domain" 2>/dev/null || true
 fi
-if [[ ! -d "/etc/letsencrypt/live/${MainDomain}/" ]]; then
- 	systemctl start nginx >/dev/null 2>&1
-	msg_err "$MainDomain SSL failed! Check Domain/IP! Exceeded limit!? Try another domain or VPS!" && exit 1
+
+if [[ ! -f "/etc/letsencrypt/live/${MainDomain}/fullchain.pem" ]]; then
+	mkdir -p "/etc/letsencrypt/live/${MainDomain}/"
+	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+		-keyout "/etc/letsencrypt/live/${MainDomain}/privkey.pem" \
+		-out "/etc/letsencrypt/live/${MainDomain}/fullchain.pem" \
+		-subj "/CN=${MainDomain}" >/dev/null 2>&1
+	msg_war "Certbot standalone challenge failed (Cloudflare Proxy ON). Self-signed SSL generated for ${MainDomain}. Switch Cloudflare to DNS Only (Grey Cloud) to issue Let's Encrypt SSL!"
 fi
 ################################# Access to configs only with cloudflare#################################
 mkdir -p /etc/nginx/sites-{available,enabled} /var/log/nginx /var/www /var/www/html
@@ -304,7 +310,7 @@ sqlite3 "$XUIDB" << EOF
 	VALUES (
 		1, 0, 0, 0, 'NovaNetX-VLESS', 1, 0, '', 443, 'vless',
 		'{"clients":[{"id":"${NOVA_UUID_ZOOM}","flow":"xtls-rprx-vision","email":"novanetx-vision"}],"decryption":"none","fallbacks":[{"dest":8443}]}',
-		'{"network":"tcp","security":"tls","tlsSettings":{"serverName":"zoom.us","certificates":[{"certificateFile":"/etc/letsencrypt/live/'"${MainDomain}"'/fullchain.pem","keyFile":"/etc/letsencrypt/live/'"${MainDomain}"'/privkey.pem"}]},"tcpSettings":{"header":{"type":"none"}}}',
+		'{"network":"tcp","security":"tls","tlsSettings":{"serverName":"zoom.us","certificates":[{"certificateFile":"/etc/letsencrypt/live/${MainDomain}/fullchain.pem","keyFile":"/etc/letsencrypt/live/${MainDomain}/privkey.pem"}]},"tcpSettings":{"header":{"type":"none"}}}',
 		'inbound-443-vless-vision',
 		'{"enabled":true,"destOverride":["http","tls","quic"]}',
 		'{"strategy":"always"}'
@@ -313,7 +319,7 @@ sqlite3 "$XUIDB" << EOF
 	VALUES (
 		1, 0, 0, 0, 'NovaNetX-VLESS-WS', 1, 0, '127.0.0.1', 2083, 'vless',
 		'{"clients":[{"id":"${NOVA_UUID_WS}","email":"novanetx-ws"}],"decryption":"none"}',
-		'{"network":"ws","security":"none","wsSettings":{"path":"/","headers":{"Host":"'"${cdndomain}"'"}}}',
+		'{"network":"ws","security":"none","wsSettings":{"path":"/","headers":{"Host":"${cdndomain}"}}}',
 		'inbound-2083-vless-ws',
 		'{"enabled":true,"destOverride":["http","tls","quic"]}',
 		'{"strategy":"always"}'
@@ -534,8 +540,8 @@ arpt="" anpt="" hypt="" tupt="" sspt="" warp="sx" ippz="4" bash <(curl -Ls https
 randname=$(gen_str).txt
 sudo cp /root/agsbx/jhsub.txt /var/www/html/$randname
 ##################################Show Details##########################################################
-sudo /usr/local/x-ui/x-ui setting -username "$XUIUSER" -password "$XUIPASS"
-if systemctl is-active --quiet x-ui || command -v x-ui &> /dev/null; then clear
+if systemctl is-active --quiet x-ui || command -v x-ui &> /dev/null; then
+	clear
 	printf '0\n' | x-ui | grep --color=never -i ':' | awk '{print "\033[1;37;40m" $0 "\033[0m"}'
 	hrline
  	nginx -T | grep -i 'configuration file /etc/nginx/sites-enabled/'  | sed 's/.*configuration file //'  | tr -d ':' | awk '{print "\033[1;32;40m" $0 "\033[0m"}'
