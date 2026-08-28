@@ -429,16 +429,7 @@ server {
 		proxy_pass http://127.0.0.1:$PORT;
 		break;
 	}
-	#v2ray-ui
-	location /${RNDSTR2}/ {
-		${Secure}auth_basic "Restricted Access";
-		${Secure}auth_basic_user_file /etc/nginx/.htpasswd;
-		proxy_set_header Host \$host;
-		proxy_set_header X-Real-IP \$remote_addr;
-		proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-		proxy_pass http://127.0.0.1:2017/;
-		break;
-	}
+
 	#Subscription Path (simple/encode)
 	location ~ ^/(?<fwdport>\d+)/sub/(?<fwdpath>.*)\$ {
 		if (\$hack = 1) {return 404;}
@@ -537,12 +528,10 @@ Restart=on-abort
 [Install]
 WantedBy=multi-user.target
 EOF
-##########################################Install v2ray-core + v2rayA-webui#############################
-sudo sh -c "$(wget -qO- https://github.com/v2rayA/v2rayA-installer/raw/main/installer.sh)" @ --with-xray
-service_enable "v2raya" "warp-plus"
+service_enable "warp-plus"
 ######################cronjob for ssl/reload service/cloudflareips######################################
 tasks=(
-  "0 0 * * * sudo su -c 'x-ui restart > /dev/null 2>&1 && systemctl reload v2raya warp-plus tor && agsbx res > /dev/null 2>&1'"
+  "0 0 * * * sudo su -c 'x-ui restart > /dev/null 2>&1 && systemctl reload warp-plus tor'"
   "0 0 * * * sudo su -c 'nginx -s reload 2>&1 | grep -q error && { pkill nginx || killall nginx; nginx -c /etc/nginx/nginx.conf; nginx -s reload; }'"
   "0 0 1 * * sudo su -c 'certbot renew --nginx --force-renewal --non-interactive --post-hook \"nginx -s reload\"' >> /var/log/certbot_renew.log 2>&1"
   "* * * * * sudo su -c '[[ \"\$(curl -s --socks5-hostname 127.0.0.1:8086 checkip.amazonaws.com)\" =~ ^((([0-9]{1,3}\.){3}[0-9]{1,3})|(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}))\$ ]] || systemctl restart warp-plus'"
@@ -550,10 +539,6 @@ tasks=(
   "0 2 * * * mkdir -p /var/backups && cp /etc/x-ui/x-ui.db /var/backups/x-ui.db.$(date +\%F-\%H-\%M-\%S) && find /var/backups -name \"x-ui.db.*\" -mtime +7 -delete"
 )
 crontab -l | grep -qE "x-ui" || { printf "%s\n" "${tasks[@]}" | crontab -; }
-##################################https://yonggekkk.github.io/argosbx/###################################
-arpt="" anpt="" hypt="" tupt="" sspt="" warp="sx" ippz="4" bash <(curl -Ls https://raw.githubusercontent.com/yonggekkk/argosbx/main/argosbx.sh)
-randname=$(gen_str).txt
-sudo cp /root/agsbx/jhsub.txt /var/www/html/$randname
 ##################################Show Details##########################################################
 if systemctl is-active --quiet x-ui || command -v x-ui &> /dev/null; then
 	clear
@@ -570,20 +555,16 @@ if systemctl is-active --quiet x-ui || command -v x-ui &> /dev/null; then
  	printf "\033[1;37;40m CPU: %s/%s Core | RAM: %s | SSD: %s Gi\033[0m\n" \
 	"$(arch)" "$(nproc)" "$(free -h | awk '/^Mem:/{print $2}')" "$(df / | awk 'NR==2 {print $2 / 1024 / 1024}')"
 	hrline
-  	msg_err  "XrayUI Panel [IP:PORT/PATH]"
+  	msg_ok "3x-ui Admin Panel [Direct IP:PORT]:"
 	[[ -n "$IP4" && "$IP4" =~ $IP4_REGEX ]] && msg_inf "IPv4: http://$IP4:$PORT$RNDSTR"
 	[[ -n "$IP6" && "$IP6" =~ $IP6_REGEX ]] && msg_inf "IPv6: http://[$IP6]:$PORT$RNDSTR"
- 	msg_err "\n V2rayA Panel [IP:PORT]"
-  	[[ -n "$IP4" && "$IP4" =~ $IP4_REGEX ]] && msg_inf "IPv4: http://$IP4:2017/"
-	[[ -n "$IP6" && "$IP6" =~ $IP6_REGEX ]] && msg_inf "IPv6: http://[$IP6]:2017/"
 	hrline
 	sudo sh -c "echo -n '${XUIUSER}:' >> /etc/nginx/.htpasswd && openssl passwd -apr1 '${XUIPASS}' >> /etc/nginx/.htpasswd"
- 	msg_ok "Admin Panel [SSL]:\n"
-	msg_inf "XrayUI: https://${domain}${RNDSTR}"
-	msg_inf "V2rayA: https://${domain}/${RNDSTR2}/\n"
-	msg "Username: $XUIUSER\n Password: $XUIPASS"
+ 	msg_ok "3x-ui Admin Panel [Nginx SSL Proxy Path]:"
+	msg_inf "URL: https://${domain}${RNDSTR}"
+	msg "Username: $XUIUSER\nPassword: $XUIPASS"
 	hrline
-	msg_ok "NovaNetX VLESS Inbounds (Port 443):\n"
+	msg_ok "NovaNetX VLESS Inbounds:\n"
 	NOVA_UUID_ZOOM=$(cat ${HOME}/.cache/nova_uuid_zoom.txt 2>/dev/null || echo "d8a042ab-5f21-40e0-9474-e83e0430f44b")
 	NOVA_UUID_WS=$(cat ${HOME}/.cache/nova_uuid_ws.txt 2>/dev/null || echo "3494c157-b4ff-4d72-9879-1480d7665ba9")
 	NOVA_DIR_DOM=$(cat ${HOME}/.cache/nova_domain.txt 2>/dev/null || echo "$domain")
@@ -592,9 +573,6 @@ if systemctl is-active --quiet x-ui || command -v x-ui &> /dev/null; then
 	msg "vless://${NOVA_UUID_ZOOM}@${NOVA_DIR_DOM}:443/?encryption=none&security=tls&fp=chrome&sni=aka.ms&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none#NovaNetX-VLESS\n"
 	msg_inf "2. NovaNetX-VLESS-WS (WebSocket + TLS + Cloudflare CDN):"
 	msg "vless://${NOVA_UUID_WS}@172.67.143.61:8443/?encryption=none&security=tls&fp=chrome&sni=${NOVA_CDN_DOM}&alpn=h2%2Chttp%2F1.1&type=ws&host=${NOVA_CDN_DOM}&headerType=none&path=%2f${NOVA_CDN_DOM}#NovaNetX-VLESS-WS\n"
-	hrline
-	msg_ok "ArgoSBX(SingBox) Configs Subscription URL:\n"
-	msg_inf "https://${domain}/${randname}"
 	hrline
 	msg_war "Note: Save This Screen!"	
 else
