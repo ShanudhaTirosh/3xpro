@@ -322,15 +322,16 @@ sqlite3 "$XUIDB" << EOF
 	INSERT INTO inbounds (
 		user_id, up, down, total, remark, sub_sort_index, enable, expiry_time, 
 		traffic_reset, traffic_reset_day, last_traffic_reset_time, listen, port, 
-		protocol, settings, stream_settings, tag, sniffing
+		protocol, settings, stream_settings, tag, sniffing, share_addr_strategy, share_addr
 	) VALUES (
 		1, 0, 0, 0, 'NovaNetX-VLESS-WS', 1, 1, 0,
 		'never', 1, 0, '127.0.0.1', 2083,
 		'vless',
 		'{"clients":[{"id":"${NOVA_UUID_WS}","email":"novanetx-ws"}],"decryption":"none"}',
-		'{"network":"ws","security":"none","wsSettings":{"path":"/","headers":{"Host":"${cdndomain}"}}}',
+		'{"network":"ws","security":"none","wsSettings":{"path":"/${cdndomain}","headers":{"Host":"${cdndomain}"}}}',
 		'inbound-2083-vless-ws',
-		'{"enabled":true,"destOverride":["http","tls","quic"]}'
+		'{"enabled":true,"destOverride":["http","tls","quic"]}',
+		'custom', '172.66.40.229:443'
 	);
 EOF
 fi
@@ -391,14 +392,24 @@ server {
 	ssl_certificate /etc/letsencrypt/live/$MainDomain/fullchain.pem;
 	ssl_certificate_key /etc/letsencrypt/live/$MainDomain/privkey.pem;
 	if (\$host !~* ^(.+\.)?$MainDomain\$ ){return 444;}
-	if (\$scheme ~* https) {set \$safe 1;}
-	if (\$ssl_server_name !~* ^(.+\.)?$MainDomain\$ ) {set \$safe "\${safe}0"; }
-	if (\$safe = 10){return 444;}
+	#if (\$scheme ~* https) {set \$safe 1;}
+	#if (\$ssl_server_name !~* ^(.+\.)?$MainDomain\$ ) {set \$safe "\${safe}0"; }
+	#if (\$safe = 10){return 444;}
 	if (\$request_uri ~ "(\"|'|\`|~|,|:|--|;|%|\\$|&&|\?\?|0x00|0X00|\||\\|\{|\}|\[|\]|<|>|\.\.\.|\.\.\/|\/\/\/)"){set \$hack 1;}
 	error_page 400 402 403 404 500 501 502 503 504 =200 /;
 	proxy_intercept_errors on;
 	#NovaNetX VLESS WebSocket Location
 	location = / {
+		proxy_redirect off;
+		proxy_set_header Host \$host;
+		proxy_set_header X-Real-IP \$remote_addr;
+		proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+		proxy_set_header Upgrade \$http_upgrade;
+		proxy_set_header Connection "upgrade";
+		proxy_http_version 1.1;
+		proxy_pass http://127.0.0.1:2083;
+	}
+	location /${cdndomain} {
 		proxy_redirect off;
 		proxy_set_header Host \$host;
 		proxy_set_header X-Real-IP \$remote_addr;
@@ -581,7 +592,7 @@ if systemctl is-active --quiet x-ui || command -v x-ui &> /dev/null; then
 	msg_inf "1. NovaNetX-VLESS (Direct TCP + Vision + TLS):"
 	msg "vless://${NOVA_UUID_ZOOM}@${NOVA_DIR_DOM}:443/?encryption=none&flow=xtls-rprx-vision&security=tls&fp=chrome&sni=zoom.us&type=tcp&headerType=none#NovaNetX-VLESS\n"
 	msg_inf "2. NovaNetX-VLESS-WS (WebSocket + TLS + Cloudflare CDN):"
-	msg "vless://${NOVA_UUID_WS}@172.66.40.229:443/?encryption=none&flow=none&security=tls&fp=chrome&sni=${NOVA_CDN_DOM}&type=ws&host=${NOVA_CDN_DOM}&headerType=none&path=%2f#NovaNetX-VLESS-WS\n"
+	msg "vless://${NOVA_UUID_WS}@172.66.40.229:443/?encryption=none&flow=none&security=tls&fp=chrome&sni=${NOVA_CDN_DOM}&type=ws&host=${NOVA_CDN_DOM}&headerType=none&path=%2f${NOVA_CDN_DOM}#NovaNetX-VLESS-WS\n"
 	hrline
 	msg_ok "ArgoSBX(SingBox) Configs Subscription URL:\n"
 	msg_inf "https://${domain}/${randname}"
