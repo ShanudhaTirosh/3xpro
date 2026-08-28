@@ -27,6 +27,19 @@ Run the following command on your fresh Linux server (Ubuntu/Debian/CentOS/AlmaL
 sudo su -c "$(command -v apt||echo dnf) -y install wget; bash <(wget -qO- https://raw.githubusercontent.com/ShanudhaTirosh/3xpro/main/x-ui-pro.sh) -panel 1 -xuiver last -cdn off -secure no -country xx"
 ```
 
+### 📖 Command Breakdown & Explanation
+
+| Parameter / Flag | Meaning & Function |
+|---|---|
+| `sudo su -c "..."` | Executes the installer with **root privileges** required to set up systemd services, Nginx, UFW, and SSL certs. |
+| `$(command -v apt\|\|echo dnf) -y install wget` | Automatically detects your Linux package manager (`apt` or `dnf`) and installs `wget`. |
+| `bash <(wget -qO- ...)` | Downloads and streams the latest `x-ui-pro.sh` script directly into Bash. |
+| **`-panel 1`** | Installs **3x-ui** (by MHSanaei) as the web administration panel. |
+| **`-xuiver last`** | Installs the **latest stable release** of 3x-ui. |
+| **`-cdn off`** | Disables strict CDN IP restrictions so direct VPS connections and Cloudflare connections are allowed. |
+| **`-secure no`** | Disables strict User-Agent filtering so all proxy apps (V2rayN, v2rayNG, Shadowrocket, Sing-Box) can connect easily. |
+| **`-country xx`** | **No Country Restriction!** Allows incoming connections from **ALL countries worldwide** (`xx` = no restriction). |
+
 ---
 
 ## ☁️ Cloudflare Setup & Proxy Status (Orange vs Grey Cloud)
@@ -111,17 +124,17 @@ The installation script automatically generates and prints the following two rea
 
 ### Random Fake HTML Site Template
 ```bash
-bash <(wget -qO- raw.githubusercontent.com/ShanudhaTirosh/3xpro/main/x-ui-pro.sh) -RandomTemplate yes
+bash <(wget -qO- https://raw.githubusercontent.com/ShanudhaTirosh/3xpro/main/x-ui-pro.sh) -RandomTemplate yes
 ```
 
 ### Enable UFW Firewall
 ```bash
-bash <(wget -qO- raw.githubusercontent.com/ShanudhaTirosh/3xpro/main/x-ui-pro.sh) -ufw on
+bash <(wget -qO- https://raw.githubusercontent.com/ShanudhaTirosh/3xpro/main/x-ui-pro.sh) -ufw on
 ```
 
 ### Uninstall NovaNetX 3X-Pro
 ```bash
-bash <(wget -qO- raw.githubusercontent.com/ShanudhaTirosh/3xpro/main/x-ui-pro.sh) -Uninstall yes
+bash <(wget -qO- https://raw.githubusercontent.com/ShanudhaTirosh/3xpro/main/x-ui-pro.sh) -Uninstall yes
 ```
 
 ---
