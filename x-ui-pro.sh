@@ -306,23 +306,31 @@ echo "$cdndomain" > ${HOME}/.cache/nova_cdndomain.txt
 
 sqlite3 "$XUIDB" << EOF
 	DELETE FROM inbounds;
-	INSERT INTO inbounds (user_id, up, down, total, remark, enable, expiry_time, listen, port, protocol, settings, stream_settings, tag, sniffing, allocate)
-	VALUES (
-		1, 0, 0, 0, 'NovaNetX-VLESS', 1, 0, '', 443, 'vless',
+	INSERT INTO inbounds (
+		user_id, up, down, total, remark, sub_sort_index, enable, expiry_time, 
+		traffic_reset, traffic_reset_day, last_traffic_reset_time, listen, port, 
+		protocol, settings, stream_settings, tag, sniffing
+	) VALUES (
+		1, 0, 0, 0, 'NovaNetX-VLESS', 1, 1, 0,
+		'never', 1, 0, '', 443,
+		'vless',
 		'{"clients":[{"id":"${NOVA_UUID_ZOOM}","flow":"xtls-rprx-vision","email":"novanetx-vision"}],"decryption":"none","fallbacks":[{"dest":8443}]}',
 		'{"network":"tcp","security":"tls","tlsSettings":{"serverName":"zoom.us","certificates":[{"certificateFile":"/etc/letsencrypt/live/${MainDomain}/fullchain.pem","keyFile":"/etc/letsencrypt/live/${MainDomain}/privkey.pem"}]},"tcpSettings":{"header":{"type":"none"}}}',
 		'inbound-443-vless-vision',
-		'{"enabled":true,"destOverride":["http","tls","quic"]}',
-		'{"strategy":"always"}'
+		'{"enabled":true,"destOverride":["http","tls","quic"]}'
 	);
-	INSERT INTO inbounds (user_id, up, down, total, remark, enable, expiry_time, listen, port, protocol, settings, stream_settings, tag, sniffing, allocate)
-	VALUES (
-		1, 0, 0, 0, 'NovaNetX-VLESS-WS', 1, 0, '127.0.0.1', 2083, 'vless',
+	INSERT INTO inbounds (
+		user_id, up, down, total, remark, sub_sort_index, enable, expiry_time, 
+		traffic_reset, traffic_reset_day, last_traffic_reset_time, listen, port, 
+		protocol, settings, stream_settings, tag, sniffing
+	) VALUES (
+		1, 0, 0, 0, 'NovaNetX-VLESS-WS', 1, 1, 0,
+		'never', 1, 0, '127.0.0.1', 2083,
+		'vless',
 		'{"clients":[{"id":"${NOVA_UUID_WS}","email":"novanetx-ws"}],"decryption":"none"}',
 		'{"network":"ws","security":"none","wsSettings":{"path":"/","headers":{"Host":"${cdndomain}"}}}',
 		'inbound-2083-vless-ws',
-		'{"enabled":true,"destOverride":["http","tls","quic"]}',
-		'{"strategy":"always"}'
+		'{"enabled":true,"destOverride":["http","tls","quic"]}'
 	);
 EOF
 fi
@@ -339,12 +347,11 @@ if ! systemctl is-active --quiet x-ui || ! command -v x-ui &> /dev/null; then
 		"https://raw.githubusercontent.com/FranzKafkaYu/x-ui/${VERSION}/install_en.sh"
 		"https://raw.githubusercontent.com/AghayeCoder/tx-ui/${VERSION}/install.sh"
 	);
-	[[ "$VERSION" == "master" ]] && VERSION=""
-	printf 'n\n' | bash <(wget -qO- "${PANEL[$PNLNUM]}") "$VERSION" ||  { printf 'n\n' | bash <(curl -Ls "${PANEL[$PNLNUM]}") "$VERSION"; }
 	service_enable "x-ui"
- 	UPDATE_XUIDB
-	ADD_NOVANETX_INBOUNDS
 fi
+UPDATE_XUIDB
+ADD_NOVANETX_INBOUNDS
+x-ui restart >/dev/null 2>&1 || true
 ###################################Get Installed XUI Port/Path##########################################
 if [[ -f $XUIDB ]]; then
 	x-ui stop > /dev/null 2>&1
@@ -375,9 +382,7 @@ server {
 	server_name $MainDomain *.$MainDomain $domain $cdndomain;
 	listen 80;
 	listen [::]:80;
-	listen 127.0.0.1:8443;
-	listen 443 ssl${OLD_H2};
-	listen [::]:443 ssl${OLD_H2};
+	listen 127.0.0.1:8443 ssl${OLD_H2};
 	${NEW_H2}http2 on; http3 on;
 	index index.html index.htm index.php index.nginx-debian.html;
 	root /var/www/html/;
